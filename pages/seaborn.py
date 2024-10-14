@@ -44,11 +44,15 @@ with col2:
 
 # Ensure both categories are selected before proceeding
 if category1 != placeholder and category2 != placeholder:
-    # Group data by the selected categories and get frequencies
-    grouped_data = df.groupby([category1, category2]).size().unstack().fillna(0)
+    # Group data by the selected categories
+    grouped_data = df.groupby([category1, category2]).size().reset_index(name='Frequencies')
 
-    # Display the normalized stacked bar chart using st.bar_chart
-    st.subheader(f'Normalized Frequencies of {category1} vs {category2}')
-    st.bar_chart(grouped_data, stack="normalize", width=800, height=600)
+    st.subheader(f'Frequencies of {category1} vs {category2}')
+    fig, ax = plt.subplots()
+    sns.barplot(x=category1, y='Frequencies', hue=category2, data=grouped_data, ax=ax)
+    plt.title(f'{category1} vs {category2}')
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
 else:
     st.warning("Please select both categories to compare.")
