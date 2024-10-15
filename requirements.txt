@@ -4,4 +4,4 @@ numpy
 plotly
 matplotlib
 seaborn
-streamlit-gsheets
+st-gsheets-connection
