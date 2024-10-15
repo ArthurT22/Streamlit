@@ -11,7 +11,7 @@ st.set_page_config(page_title="DEI Arthur", page_icon=":bar_chart:",layout="wide
 from streamlit_gsheets import GSheetsConnection
 
 # # Create a connection object.
-conn = st.connection("gsheets", type=GSheetsConnection)
+conn = st.connection("gsheets", type=GSheetsConnection, url ="https://docs.google.com/spreadsheets/d/1RKONCl4rEU7VfPhr8Moz2tLH5gw2hW1HFPZ6VYVuw70/edit?gid=1068103342#gid=1068103342" )
 df = conn.read()
 
 st.title(" :bar_chart: Workforce Directory :bar_chart:")
