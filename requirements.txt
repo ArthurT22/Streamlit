@@ -3,3 +3,4 @@ plotly
 altair
 seaborn
 pandas
+matplotlib
