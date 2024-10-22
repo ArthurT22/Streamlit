@@ -343,10 +343,9 @@ if selected_page == 'Tenure':
     # Add a horizontal rule to divide the charts
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
-    # Bar chart for Years of Service
-
+    # Bar chart for Years of Service in natural order
     bar_chart = alt.Chart(service_group_counts).mark_bar().encode(
-            x=alt.X('Service_Group:N', title='Years of Service', sort='-y'),  # Sort by frequency (Count) in descending order
+            x=alt.X('Service_Group:N', title='Years of Service', sort=labels),  # Display in natural order
             y=alt.Y('Percentage:Q', title='Percentage'),
             color=alt.Color('Service_Group:N', scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values())), legend=None)
         ).properties(
