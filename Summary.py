@@ -12,14 +12,14 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read()
 
 # Sidebar Widgets
-st.sidebar.header('Filters')
+st.sidebar.header('METRICS')
 
-# Multiselect widget for filtering pages
-pages = ['Gender', 'Generation', 'Religion', 'Unit']
-selected_pages = st.sidebar.multiselect("Choose the summary you want to display:", pages)
+# Selectbox widget for filtering pages
+pages = ['Choose an option', 'Gender', 'Generation', 'Religion', 'Unit', 'Tenure']
+selected_page = st.sidebar.selectbox("Choose the Summary Matrix you want to display:", pages,)
 
 # Title
-if 'Gender' in selected_pages:
+if selected_page == 'Gender':
     # Calculate the gender distribution
     gender_counts = df['gender'].value_counts().reset_index()
     gender_counts.columns = ['gender', 'Count']
@@ -72,21 +72,7 @@ if 'Gender' in selected_pages:
     # Display the bar chart in Streamlit
     st.altair_chart(bar_chart, use_container_width=True)
 
-    # Create a pie chart for Gender vs Frequency using Plotly with the same color scheme
-    pie_chart = px.pie(
-        gender_counts, 
-        names='gender', 
-        values='Count', 
-        title='Gender Distribution (Pie Chart)',
-        color='gender',  # Apply consistent colors
-        color_discrete_map=color_map,  # Use the same color map for the pie chart
-        hole=0.4  # This makes it a donut chart; remove if you want a full pie chart
-    )
-
-    # Display the pie chart in Streamlit
-    st.plotly_chart(pie_chart, use_container_width=True)
-
-if 'Generation' in selected_pages:
+if selected_page == 'Generation':
     # Calculate the generation distribution
     generation_counts = df['generation'].value_counts().reset_index()
     generation_counts.columns = ['generation', 'Count']
@@ -152,21 +138,7 @@ if 'Generation' in selected_pages:
     # Display the bar chart in Streamlit
     st.altair_chart(bar_chart, use_container_width=True)
 
-    # Create a pie chart for Generation vs Frequency using Plotly with the same color scheme
-    pie_chart = px.pie(
-        generation_counts, 
-        names='generation', 
-        values='Count', 
-        title='Generation Distribution (Pie Chart)',
-        color='generation',  # Apply consistent colors
-        color_discrete_map=color_map,  # Use the same color map for the pie chart
-        hole=0.4  # This makes it a donut chart; remove if you want a full pie chart
-    )
-
-    # Display the pie chart in Streamlit
-    st.plotly_chart(pie_chart, use_container_width=True)
-
-if 'Religion' in selected_pages:
+if selected_page == 'Religion':
     # Calculate the religion distribution
     religion_counts = df['Religious Denomination Key'].value_counts().reset_index()
     religion_counts.columns = ['Religious Denomination Key', 'Count']
@@ -239,21 +211,7 @@ if 'Religion' in selected_pages:
     # Display the bar chart in Streamlit
     st.altair_chart(bar_chart, use_container_width=True)
 
-    # Create a pie chart for Religion vs Frequency using Plotly with the same color scheme
-    pie_chart = px.pie(
-        religion_counts, 
-        names='Religious Denomination Key', 
-        values='Count', 
-        title='Religion Distribution (Pie Chart)',
-        color='Religious Denomination Key',  # Apply consistent colors
-        color_discrete_map=color_map,  # Use the same color map for the pie chart
-        hole=0.4  # This makes it a donut chart; remove if you want a full pie chart
-    )
-
-    # Display the pie chart in Streamlit
-    st.plotly_chart(pie_chart, use_container_width=True)
-
-if 'Unit' in selected_pages:
+if selected_page == 'Unit':
     # Calculate the unit distribution
     unit_counts = df['unit'].value_counts().reset_index()
     unit_counts.columns = ['unit', 'Count']
@@ -334,16 +292,68 @@ if 'Unit' in selected_pages:
     # Display the bar chart in Streamlit
     st.altair_chart(bar_chart, use_container_width=True)
 
-    # Create a pie chart for Unit vs Frequency using Plotly with the same color scheme
-    pie_chart = px.pie(
-        unit_counts, 
-        names='unit', 
-        values='Count', 
-        title='Unit Distribution (Pie Chart)',
-        color='unit',  # Apply consistent colors
-        color_discrete_map=color_map,  # Use the same color map for the pie chart
-        hole=0.4  # This makes it a donut chart; remove if you want a full pie chart
-    )
+if selected_page == 'Tenure':
+    # Define bins for grouping the years of service
+    bins = [-1, 1, 3, 6, 10, 15, 20, 25, float('inf')]
+    labels = ['<1 Year', '1-3 Year', '4-6 Year', '6-10 Year', '11-15 Year', '16-20 Year', '20-25 Year', '>25 Year']
 
-    # Display the pie chart in Streamlit
-    st.plotly_chart(pie_chart, use_container_width=True)
+    # Create a new column in the DataFrame that categorizes years of service
+    df['Service_Group'] = pd.cut(df['Years'], bins=bins, labels=labels, right=False)
+
+    # Calculate the percentage of each category
+    service_group_counts = df['Service_Group'].value_counts(normalize=True).sort_index() * 100
+    service_group_counts = service_group_counts.reset_index()
+    service_group_counts.columns = ['Service_Group', 'Percentage']
+
+    # Define a consistent color scheme for service groups
+    color_map = {
+        '<1 Year': '#1f77b4',       # Blue
+        '1-3 Year': '#ff7f0e',      # Orange
+        '4-6 Year': '#2ca02c',      # Green
+        '6-10 Year': '#d62728',     # Red
+        '11-15 Year': '#9467bd',    # Purple
+        '16-20 Year': '#8c564b',    # Brown
+        '20-25 Year': '#e377c2',    # Pink
+        '>25 Year': '#7f7f7f'       # Gray
+    }
+
+    # Title
+    st.title("Employee Tenure Summary")
+
+    # Display the average years of service
+    average_years = df['Years'].mean().round(1)
+    st.markdown(f"**Average Working Period:** {average_years} Years")
+
+    # Add a horizontal rule to divide the charts
+    st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
+
+    # Create a column layout to display the percentage summary
+    cols = st.columns(len(service_group_counts))
+
+    # Display the percentage summary for each service group
+    for i, row in service_group_counts.iterrows():
+        with cols[i]:
+            st.markdown(f"""
+            <div style='text-align: center'>
+                <h5>{row['Service_Group']}</h5>
+                <h1><strong>{row['Percentage']:.1f}%</strong></h1>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Add a horizontal rule to divide the charts
+    st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
+
+    # Bar chart for Years of Service
+
+    bar_chart = alt.Chart(service_group_counts).mark_bar().encode(
+            x=alt.X('Service_Group:N', title='Years of Service', sort='-y'),  # Sort by frequency (Count) in descending order
+            y=alt.Y('Percentage:Q', title='Percentage'),
+            color=alt.Color('Service_Group:N', scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values())), legend=None)
+        ).properties(
+            title='Working Period (Bar Chart)',
+            width=600,
+            height=400
+        )
+
+    # Display the bar chart in Streamlit
+    st.altair_chart(bar_chart, use_container_width=True)
