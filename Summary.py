@@ -13,11 +13,10 @@ df = conn.read()
 
 # Sidebar Widgets
 st.sidebar.header('Filters')
-st.sidebar.write("Use these options to filter the data")
 
 # Multiselect widget for filtering pages
 pages = ['Gender', 'Generation', 'Religion', 'Unit']
-selected_pages = st.sidebar.multiselect("Choose the summary you want to display:", pages, default=pages)
+selected_pages = st.sidebar.multiselect("Choose the summary you want to display:", pages)
 
 # Title
 if 'Gender' in selected_pages:
