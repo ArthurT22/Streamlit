@@ -402,7 +402,7 @@ if selected_page != 'Select an option...':
 
             for i, tenure_group in enumerate(color_map.keys()):
                 cols[i].markdown(f"<div style='text-align: center'><h5>{tenure_group}</h5>"
-                                f"<h1><strong>{total_percentage[tenure_group]}%</strong></h1>"
+                                f"<h2><strong>{total_percentage[tenure_group]}%</strong></h2>"
                                 f"<p>{int(tenure_sums[tenure_group])}</p></div>", unsafe_allow_html=True)
 
             st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
