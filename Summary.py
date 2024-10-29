@@ -34,13 +34,25 @@ selected_units = st.sidebar.multiselect("Select Unit(s)", unit_options)
 selected_subunits = st.sidebar.multiselect("Select Subunit(s)", subunit_options)
 selected_layers = st.sidebar.multiselect("Select Layer(s)", layer_options)
 
+# Additional Filters for Gender, Generation, Religion, and Tenure
+gender_options = df['gender'].unique().tolist() if 'gender' in df.columns else []
+generation_options = df['generation'].unique().tolist() if 'generation' in df.columns else []
+religion_options = df['Religious Denomination Key'].unique().tolist() if 'Religious Denomination Key' in df.columns else []
+tenure_options = ['<1 Year', '1-3 Year', '4-6 Year', '6-10 Year', '11-15 Year', '16-20 Year', '20-25 Year', '>25 Year']
+
+# Multiselect filters for Gender, Generation, Religion, and Tenure
+selected_genders = st.sidebar.multiselect("Select Gender(s)", gender_options)
+selected_generations = st.sidebar.multiselect("Select Generation(s)", generation_options)
+selected_religions = st.sidebar.multiselect("Select Religion(s)", religion_options)
+selected_tenures = st.sidebar.multiselect("Select Tenure(s)", tenure_options)
+
 st.sidebar.header('Breakdown Variable')
 
 # Add Breakdown Variable Selection
 breakdown_options = ['unit', 'subunit', 'layer']
 selected_breakdown = st.sidebar.selectbox("Breakdown Variable", breakdown_options)
 
-# Filter the data based on selected units, subunits, and layers
+# Filter the data based on selected units, subunits, layers, and additional criteria
 filtered_df = df.copy()
 
 # Apply filters only if specific options are selected; otherwise, keep the full dataset
@@ -53,10 +65,27 @@ if selected_subunits and 'subunit' in filtered_df.columns:
 # Adjust filter logic for 'layer' to include "N-A" option for missing data
 if selected_layers and 'layer' in filtered_df.columns:
     if "N-A" in selected_layers:
-        # Filter rows where layer is "N-A" or matches other selected layers
         filtered_df = filtered_df[filtered_df['layer'].isin(selected_layers) | (filtered_df['layer'] == "N-A")]
     else:
         filtered_df = filtered_df[filtered_df['layer'].isin(selected_layers)]
+
+# Filter for Gender, Generation, Religion, and Tenure
+if selected_genders and 'gender' in filtered_df.columns:
+    filtered_df = filtered_df[filtered_df['gender'].isin(selected_genders)]
+
+if selected_generations and 'generation' in filtered_df.columns:
+    filtered_df = filtered_df[filtered_df['generation'].isin(selected_generations)]
+
+if selected_religions and 'Religious Denomination Key' in filtered_df.columns:
+    filtered_df = filtered_df[filtered_df['Religious Denomination Key'].isin(selected_religions)]
+
+# For tenure, categorize 'Years' column and filter based on selected tenure groups
+bins = [-1, 1, 3, 6, 10, 15, 20, 25, float('inf')]
+labels = ['<1 Year', '1-3 Year', '4-6 Year', '6-10 Year', '11-15 Year', '16-20 Year', '20-25 Year', '>25 Year']
+filtered_df['Service_Group'] = pd.cut(filtered_df['Years'], bins=bins, labels=labels, right=False)
+
+if selected_tenures:
+    filtered_df = filtered_df[filtered_df['Service_Group'].isin(selected_tenures)]
 
 # Function to display gender summary
 def display_gender_summary():
