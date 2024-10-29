@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 import plotly.express as px
 
-st.set_page_config(page_title="DEI Arthur", page_icon=":bar_chart:", layout="wide")
+st.set_page_config(page_title="KG DEI", page_icon=":bar_chart:", layout="wide")
 
 from streamlit_gsheets import GSheetsConnection
 
@@ -11,7 +11,9 @@ from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read()
 
-st.sidebar.header('Summary')
+
+st.sidebar.header('KG DEI Dashboard')
+st.sidebar.header('Metrics')
 
 # Page selection
 pages = ['Select an option...', 'Gender', 'Generation', 'Religion', 'Tenure']
