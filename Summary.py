@@ -16,31 +16,20 @@ st.sidebar.header('Metrics')
 
 # Page selection
 pages = ['Gender', 'Generation', 'Religion', 'Tenure']
-selected_page = st.sidebar.selectbox("Choose the summary you want to display:", pages)
+selected_page = st.sidebar.selectbox("Choose the Metrics you want to display:", pages)
 
 # Sidebar Widgets
 st.sidebar.header('Filters')
 
-# Unit, Subunit, and Layer Filters using multiselect
-unit_options = ['All'] + df['unit'].unique().tolist()
-subunit_options = ['All'] + df['subunit'].unique().tolist() if 'subunit' in df.columns else []
-layer_options = ['All'] + df['layer'].unique().tolist() if 'layer' in df.columns else []
+# Unit, Subunit, and Layer Filters using multiselect without "All" option
+unit_options = df['unit'].unique().tolist()
+subunit_options = df['subunit'].unique().tolist() if 'subunit' in df.columns else []
+layer_options = df['layer'].unique().tolist() if 'layer' in df.columns else []
 
-# Define custom multiselect function to handle "All" logic
-def custom_multiselect(label, options):
-    selected = st.sidebar.multiselect(label, options, default=['All'])
-
-    # Logic to handle the "All" option
-    if 'All' in selected and len(selected) > 1:
-        selected.remove('All')
-    elif not selected:
-        selected = ['All']  # Set default to 'All' if nothing is selected
-
-    return selected
-
-selected_units = custom_multiselect("Select Unit(s)", unit_options)
-selected_subunits = custom_multiselect("Select Subunit(s)", subunit_options)
-selected_layers = custom_multiselect("Select Layer(s)", layer_options)
+# Multiselect filters for Unit, Subunit, and Layer
+selected_units = st.sidebar.multiselect("Select Unit(s)", unit_options)
+selected_subunits = st.sidebar.multiselect("Select Subunit(s)", subunit_options)
+selected_layers = st.sidebar.multiselect("Select Layer(s)", layer_options)
 
 st.sidebar.header('Breakdown Variable')
 
@@ -51,13 +40,14 @@ selected_breakdown = st.sidebar.selectbox("Breakdown Variable", breakdown_option
 # Filter the data based on selected units, subunits, and layers
 filtered_df = df.copy()
 
-if 'All' not in selected_units:
+# Apply filters only if specific options are selected; otherwise, keep the full dataset
+if selected_units:
     filtered_df = filtered_df[filtered_df['unit'].isin(selected_units)]
 
-if 'All' not in selected_subunits and 'subunit' in filtered_df.columns:
+if selected_subunits and 'subunit' in filtered_df.columns:
     filtered_df = filtered_df[filtered_df['subunit'].isin(selected_subunits)]
 
-if 'All' not in selected_layers and 'layer' in filtered_df.columns:
+if selected_layers and 'layer' in filtered_df.columns:
     filtered_df = filtered_df[filtered_df['layer'].isin(selected_layers)]
 
 # Function to display gender summary
@@ -84,7 +74,7 @@ def display_gender_summary():
         on=[selected_breakdown, 'Gender']
     )
 
-    title_text = "Gender Summary (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Gender Summary (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    title_text = "Gender Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Gender Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Gender by {selected_breakdown}")
 
@@ -118,44 +108,75 @@ def display_gender_summary():
 
 # Function to display generation summary
 def display_generation_summary():
+    # Choose the correct DataFrame based on filters
     display_df = df if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else filtered_df
+    
+    # Group by the selected breakdown and calculate generation distribution
     generation_counts = display_df.groupby([selected_breakdown, 'generation']).size().unstack().fillna(0)
 
+    # Define color map for generations
     color_map = {
-        'Boomers': '#1f77b4', 'Gen X': '#ff7f0e', 'Gen Y': '#2ca02c', 'Gen Z': '#d62728', 'Post War': '#9467bd'
+        'Boomers': '#1f77b4',  # Blue
+        'Gen X': '#ff7f0e',    # Orange
+        'Gen Y': '#2ca02c',    # Green
+        'Gen Z': '#d62728',    # Red
+        'Post War': '#9467bd'  # Purple
     }
 
+    # Ensure all generations exist in data, add with 0 count if missing
     for generation in color_map.keys():
         if generation not in generation_counts.columns:
             generation_counts[generation] = 0
 
+    # Calculate percentage for each generation
     generation_percentage = generation_counts.div(generation_counts.sum(axis=1), axis=0) * 100
     generation_percentage = generation_percentage.reset_index()
 
+    # Combine count and percentage for tooltips
     generation_combined = generation_percentage.melt(id_vars=[selected_breakdown], value_vars=list(color_map.keys()),
-                                                    var_name='Generation', value_name='Percentage')
-
+                                                     var_name='Generation', value_name='Percentage')
     generation_combined = generation_combined.merge(
         generation_counts.reset_index().melt(id_vars=[selected_breakdown], value_vars=list(color_map.keys()),
-                                            var_name='Generation', value_name='Count'),
+                                             var_name='Generation', value_name='Count'),
         on=[selected_breakdown, 'Generation']
     )
 
-    title_text = "Generation Summary (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Generation Summary (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    # Display title with filter details
+    title_text = "Generation Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Generation Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Generation by {selected_breakdown}")
 
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
+    # Display total counts and percentages with birth year ranges
     total_counts = generation_counts.sum().sum()
     total_percentage = {gen: (generation_counts[gen].sum() / total_counts * 100).round(2) if total_counts > 0 else 0 for gen in color_map.keys()}
 
+    # Define birth year ranges for each generation
+    birth_year_ranges = {
+        'Post War': '(1928-1945)',
+        'Boomers': '(1946-1964)',
+        'Gen X': '(1965-1980)',
+        'Gen Y': '(1981-1996)',
+        'Gen Z': '(1997-2012)'
+    }
+
+    # Display generation information with birth years
     cols = st.columns(len(color_map.keys()))
     for i, (gen, color) in enumerate(color_map.items()):
-        cols[i].markdown(f"<div style='text-align: center'><h5>{gen}</h5><h2><strong>{total_percentage[gen]}%</strong></h2><p>{int(generation_counts[gen].sum())}</p></div>", unsafe_allow_html=True)
+        birth_year_range = birth_year_ranges.get(gen, "")
+        cols[i].markdown(f"""
+            <div style='text-align: center'>
+                <h5 style="margin-bottom: 0;">{gen}</h5>
+                <h5 style='margin-top: 0; margin-bottom: 0;'>{birth_year_range}</h5>
+                <h1><strong>{total_percentage[gen]}%</strong></h1>
+                <p>{int(generation_counts[gen].sum())}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
+    # Horizontal stacked percentage bar chart for Generation Distribution by Breakdown Variable
     bar_chart = alt.Chart(generation_combined).mark_bar().encode(
         x=alt.X('Percentage:Q', title='Percentage', scale=alt.Scale(domain=[0, 100])),
         y=alt.Y(f'{selected_breakdown}:N', title=selected_breakdown),
@@ -168,6 +189,7 @@ def display_generation_summary():
         height=400
     )
 
+    # Display the bar chart in Streamlit (Bottom Part)
     st.altair_chart(bar_chart, use_container_width=True)
 
 # Function to display religion summary
@@ -196,7 +218,7 @@ def display_religion_summary():
         on=[selected_breakdown, 'Religion']
     )
 
-    title_text = "Religion Summary (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Religion Summary (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    title_text = "Religion Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Religion Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Religion by {selected_breakdown}")
 
@@ -256,7 +278,7 @@ def display_tenure_summary():
         on=[selected_breakdown, 'Tenure Group']
     )
 
-    title_text = "Tenure Summary (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Tenure Summary (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    title_text = "Tenure Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Tenure Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Tenure by {selected_breakdown}")
 
