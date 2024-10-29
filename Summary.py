@@ -11,6 +11,9 @@ from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read()
 
+# Replace NaN values in the 'layer' column with "N-A" for display and filtering purposes
+df['layer'] = df['layer'].fillna("N-A")
+
 st.sidebar.header('KG DEI Dashboard')
 st.sidebar.header('Metrics')
 
@@ -47,8 +50,13 @@ if selected_units:
 if selected_subunits and 'subunit' in filtered_df.columns:
     filtered_df = filtered_df[filtered_df['subunit'].isin(selected_subunits)]
 
+# Adjust filter logic for 'layer' to include "N-A" option for missing data
 if selected_layers and 'layer' in filtered_df.columns:
-    filtered_df = filtered_df[filtered_df['layer'].isin(selected_layers)]
+    if "N-A" in selected_layers:
+        # Filter rows where layer is "N-A" or matches other selected layers
+        filtered_df = filtered_df[filtered_df['layer'].isin(selected_layers) | (filtered_df['layer'] == "N-A")]
+    else:
+        filtered_df = filtered_df[filtered_df['layer'].isin(selected_layers)]
 
 # Function to display gender summary
 def display_gender_summary():
