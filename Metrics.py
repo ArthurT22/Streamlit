@@ -183,11 +183,11 @@ def display_generation_summary():
 
     # Define color map for generations
     color_map = {
-        'Boomers': '#1f77b4',  # Blue
-        'Gen X': '#ff7f0e',    # Orange
-        'Gen Y': '#2ca02c',    # Green
-        'Gen Z': '#d62728',    # Red
-        'Post War': '#9467bd'  # Purple
+        'BOOMERS': '#1f77b4',  # Blue
+        'GEN X': '#ff7f0e',    # Orange
+        'GEN Y': '#2ca02c',    # Green
+        'GEN Z': '#d62728',    # Red
+        'POST WAR': '#9467bd'  # Purple
     }
 
     # Ensure all generations are represented in data
@@ -221,11 +221,11 @@ def display_generation_summary():
 
     # Define birth year ranges for each generation
     birth_year_ranges = {
-        'Post War': '(1928-1945)',
-        'Boomers': '(1946-1964)',
-        'Gen X': '(1965-1980)',
-        'Gen Y': '(1981-1996)',
-        'Gen Z': '(1997-2012)'
+        'POST WAR': '(1928-1945)',
+        'BOOMERS': '(1946-1964)',
+        'GEN X': '(1965-1980)',
+        'GEN Y': '(1981-1996)',
+        'GEN Z': '(1997-2012)'
     }
 
     # Display generation information with birth years
