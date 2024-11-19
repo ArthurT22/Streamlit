@@ -17,9 +17,15 @@ df['layer'] = df['layer'].fillna("N-A")
 st.sidebar.header('KG DEI Dashboard')
 st.sidebar.header('Metrics')
 
-# Page selection
-pages = ['Gender', 'Generation', 'Religion', 'Tenure']
+# Page selection with a blank option
+pages = ['', 'Gender', 'Generation', 'Religion', 'Tenure']
 selected_page = st.sidebar.selectbox("Choose the Metrics you want to display:", pages)
+
+st.sidebar.header('Breakdown Variable')
+
+# Add Breakdown Variable Selection
+breakdown_options = ['unit', 'subunit', 'layer']
+selected_breakdown = st.sidebar.selectbox("Breakdown Variable", breakdown_options)
 
 # Sidebar Widgets
 st.sidebar.header('Filters')
@@ -45,12 +51,6 @@ selected_genders = st.sidebar.multiselect("Select Gender(s)", gender_options)
 selected_generations = st.sidebar.multiselect("Select Generation(s)", generation_options)
 selected_religions = st.sidebar.multiselect("Select Religion(s)", religion_options)
 selected_tenures = st.sidebar.multiselect("Select Tenure(s)", tenure_options)
-
-st.sidebar.header('Breakdown Variable')
-
-# Add Breakdown Variable Selection
-breakdown_options = ['unit', 'subunit', 'layer']
-selected_breakdown = st.sidebar.selectbox("Breakdown Variable", breakdown_options)
 
 # Filter the data based on selected units, subunits, layers, and additional criteria
 filtered_df = df.copy()
@@ -87,15 +87,60 @@ filtered_df['Service_Group'] = pd.cut(filtered_df['Years'], bins=bins, labels=la
 if selected_tenures:
     filtered_df = filtered_df[filtered_df['Service_Group'].isin(selected_tenures)]
 
+# Display total employee count
+def display_total_employees_with_breakdown():
+    total_employees = len(filtered_df)
+    st.title("Total Employees")
+    st.subheader(f"{total_employees:,}")
+    st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
+    
+    # Group by the selected breakdown and count employees
+    breakdown_counts = (
+        filtered_df.groupby(selected_breakdown)
+        .size()
+        .reset_index(name="Count")
+        .sort_values("Count", ascending=False)
+    )
+    breakdown_counts.rename(columns={selected_breakdown: selected_breakdown.capitalize()}, inplace=True)
+    
+    # Reset the index to remove the default numbering
+    breakdown_counts = breakdown_counts.reset_index(drop=True)
+    
+    # Display the data in a table
+    st.table(breakdown_counts)
+    
+    # Create a horizontal bar chart
+    fig = px.bar(
+        breakdown_counts,
+        x="Count",
+        y=selected_breakdown.capitalize(),
+        orientation="h",
+        text="Count",
+        labels={"Count": "Employee Count"},
+    )
+    
+    fig.update_traces(textposition="inside")
+    fig.update_layout(
+        title=f"Employee Distribution by {selected_breakdown.capitalize()}",
+        xaxis_title="Count",
+        yaxis_title=selected_breakdown.capitalize(),
+        bargap=0.2,
+        height=600,
+        width=800,
+    )
+    
+    # Display the chart
+    st.plotly_chart(fig, use_container_width=True)
+
 # Function to display gender summary
 def display_gender_summary():
     # Replace missing values in 'layer' column with "N-A"
     df['layer'] = df['layer'].fillna("N-A")
     filtered_df['layer'] = filtered_df['layer'].fillna("N-A")
 
-    # Choose the correct DataFrame based on filters
-    display_df = df if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else filtered_df
-    
+    # Select the correct DataFrame based on filters
+    display_df = filtered_df.copy()
+
     # Group by the selected breakdown variable and calculate gender distribution
     gender_counts = display_df.groupby([selected_breakdown, 'gender']).size().unstack().fillna(0)
 
@@ -109,27 +154,26 @@ def display_gender_summary():
     gender_percentage = gender_counts.div(gender_counts.sum(axis=1), axis=0) * 100
     gender_percentage = gender_percentage.reset_index()
 
-    # Define color scheme for gender
-    color_map = {'Male': '#90d5ff', 'Female': '#ffb5c0'}
-    
-    # Combine count and percentage data for tooltips
+    # Combine count and percentage data
     gender_combined = gender_percentage.melt(id_vars=[selected_breakdown], value_vars=['Male', 'Female'],
                                              var_name='Gender', value_name='Percentage')
-
     gender_combined = gender_combined.merge(
         gender_counts.reset_index().melt(id_vars=[selected_breakdown], value_vars=['Male', 'Female'],
                                          var_name='Gender', value_name='Count'),
         on=[selected_breakdown, 'Gender']
     )
+    gender_combined['Label'] = gender_combined.apply(
+        lambda row: f"{int(row['Count'])} ({row['Percentage']:.1f}%)", axis=1
+    )
 
     # Display title with filter details
-    title_text = "Gender Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Gender Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    title_text = "Gender Metrics (All Units)" if not selected_units and not selected_subunits and not selected_layers else f"Gender Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Gender by {selected_breakdown}")
 
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
-    # Display male and female percentages and counts
+    # Display total counts and percentages
     total_male = gender_counts['Male'].sum()
     total_female = gender_counts['Female'].sum()
     total_people = total_male + total_female
@@ -139,35 +183,39 @@ def display_gender_summary():
     col1, col2 = st.columns(2)
     col1.markdown(f"<div style='text-align: center'><h5>Male</h5><h1><strong>{male_percentage}%</strong></h1><p>{int(total_male)}</p></div>", unsafe_allow_html=True)
     col2.markdown(f"<div style='text-align: center'><h5>Female</h5><h1><strong>{female_percentage}%</strong></h1><p>{int(total_female)}</p></div>", unsafe_allow_html=True)
-    
+
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
-    # Custom order for layer breakdown, including "N-A"
-    if selected_breakdown == 'layer':
-        custom_layer_order = [
-            "Group 5 STR Layer 1", "Group 4 STR Layer 2", "Group 3 STR Layer 3A",
-            "Group 3 STR Layer 3B", "Group 2 STR Layer 4", "Group 1 STR Layer 5",
-            "Group 5", "Group 4", "Group 3", "Group 2", "Group 1", "N-A"
-        ]
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown, sort=custom_layer_order)
-    else:
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown)
-
-    # Horizontal stacked percentage bar chart for Gender Distribution by Breakdown Variable
-    bar_chart = alt.Chart(gender_combined).mark_bar().encode(
-        x=alt.X('Percentage:Q', title='Percentage', scale=alt.Scale(domain=[0, 100])),
-        y=y_encoding,
-        color=alt.Color('Gender:N', scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values()))),
-        tooltip=[alt.Tooltip(f'{selected_breakdown}:N'), alt.Tooltip('Percentage:Q', format='.2f'),
-                 alt.Tooltip('Count:Q', title='Count'), 'Gender:N']
-    ).properties(
-        title=f'Gender Distribution by {selected_breakdown} (Stacked Bar Chart)',
-        width=700,
-        height=400
+    # Plotly stacked bar chart
+    fig = px.bar(
+        gender_combined,
+        x="Percentage",
+        y=selected_breakdown,
+        color="Gender",
+        orientation="h",
+        text="Label",
+        color_discrete_map={'Male': '#90d5ff', 'Female': '#ffb5c0'},
+        labels={
+            "Percentage": "Percentage (%)",
+            selected_breakdown: selected_breakdown.capitalize(),
+            "Gender": "Gender"
+        },
     )
 
-    # Display the bar chart in Streamlit
-    st.altair_chart(bar_chart, use_container_width=True)
+    # Update layout to improve readability
+    fig.update_traces(textposition="inside", insidetextanchor="middle")
+    fig.update_layout(
+        title=f"Gender Distribution by {selected_breakdown}",
+        xaxis_title="Percentage (%)",
+        yaxis_title=selected_breakdown.capitalize(),
+        bargap=0.2,
+        height=600,
+        width=800,
+        legend_title="Gender"
+    )
+
+    # Display the Plotly chart in Streamlit
+    st.plotly_chart(fig, use_container_width=True)
 
 # Function to display generation summary
 def display_generation_summary():
@@ -175,22 +223,22 @@ def display_generation_summary():
     df['layer'] = df['layer'].fillna("N-A")
     filtered_df['layer'] = filtered_df['layer'].fillna("N-A")
 
-    # Choose the correct DataFrame based on filters
-    display_df = df if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else filtered_df
-    
+    # Select the correct DataFrame based on filters
+    display_df = filtered_df.copy()
+
     # Group by the selected breakdown and calculate generation distribution
     generation_counts = display_df.groupby([selected_breakdown, 'generation']).size().unstack().fillna(0)
 
     # Define color map for generations
     color_map = {
+        'POST WAR': '#9467bd',  # Purple
         'BOOMERS': '#1f77b4',  # Blue
         'GEN X': '#ff7f0e',    # Orange
         'GEN Y': '#2ca02c',    # Green
-        'GEN Z': '#d62728',    # Red
-        'POST WAR': '#9467bd'  # Purple
+        'GEN Z': '#d62728'     # Red
     }
 
-    # Ensure all generations are represented in data
+    # Ensure all generations are represented in the data
     for generation in color_map.keys():
         if generation not in generation_counts.columns:
             generation_counts[generation] = 0
@@ -199,7 +247,7 @@ def display_generation_summary():
     generation_percentage = generation_counts.div(generation_counts.sum(axis=1), axis=0) * 100
     generation_percentage = generation_percentage.reset_index()
 
-    # Combine count and percentage data for tooltips
+    # Combine count and percentage data for tooltips and text labels
     generation_combined = generation_percentage.melt(id_vars=[selected_breakdown], value_vars=list(color_map.keys()),
                                                      var_name='Generation', value_name='Percentage')
     generation_combined = generation_combined.merge(
@@ -207,9 +255,12 @@ def display_generation_summary():
                                              var_name='Generation', value_name='Count'),
         on=[selected_breakdown, 'Generation']
     )
+    generation_combined['Label'] = generation_combined.apply(
+        lambda row: f"{int(row['Count'])} ({row['Percentage']:.1f}%)", axis=1
+    )
 
     # Display title with filter details
-    title_text = "Generation Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Generation Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    title_text = "Generation Metrics (All Units)" if not selected_units and not selected_subunits and not selected_layers else f"Generation Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Generation by {selected_breakdown}")
 
@@ -243,32 +294,36 @@ def display_generation_summary():
 
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
-    # Custom order for layer breakdown, including "N-A"
-    if selected_breakdown == 'layer':
-        custom_layer_order = [
-            "Group 5 STR Layer 1", "Group 4 STR Layer 2", "Group 3 STR Layer 3A",
-            "Group 3 STR Layer 3B", "Group 2 STR Layer 4", "Group 1 STR Layer 5",
-            "Group 5", "Group 4", "Group 3", "Group 2", "Group 1", "N-A"
-        ]
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown, sort=custom_layer_order)
-    else:
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown)
-
-    # Horizontal stacked percentage bar chart for Generation Distribution by Breakdown Variable
-    bar_chart = alt.Chart(generation_combined).mark_bar().encode(
-        x=alt.X('Percentage:Q', title='Percentage', scale=alt.Scale(domain=[0, 100])),
-        y=y_encoding,
-        color=alt.Color('Generation:N', scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values()))),
-        tooltip=[alt.Tooltip(f'{selected_breakdown}:N'), alt.Tooltip('Percentage:Q', format='.2f'),
-                 alt.Tooltip('Count:Q', title='Count'), 'Generation:N']
-    ).properties(
-        title=f'Generation Distribution by {selected_breakdown} (Stacked Bar Chart)',
-        width=700,
-        height=400
+    # Plotly stacked bar chart
+    fig = px.bar(
+        generation_combined,
+        x="Percentage",
+        y=selected_breakdown,
+        color="Generation",
+        orientation="h",
+        text="Label",
+        color_discrete_map=color_map,
+        labels={
+            "Percentage": "Percentage (%)",
+            selected_breakdown: selected_breakdown.capitalize(),
+            "Generation": "Generation"
+        },
     )
 
-    # Display the bar chart in Streamlit (Bottom Part)
-    st.altair_chart(bar_chart, use_container_width=True)
+    # Update layout to improve readability
+    fig.update_traces(textposition="inside", insidetextanchor="middle")
+    fig.update_layout(
+        title=f"Generation Distribution by {selected_breakdown}",
+        xaxis_title="Percentage (%)",
+        yaxis_title=selected_breakdown.capitalize(),
+        bargap=0.2,
+        height=600,
+        width=800,
+        legend_title="Generation"
+    )
+
+    # Display the Plotly chart in Streamlit
+    st.plotly_chart(fig, use_container_width=True)
 
 # Function to display religion summary
 def display_religion_summary():
@@ -276,16 +331,21 @@ def display_religion_summary():
     df['layer'] = df['layer'].fillna("N-A")
     filtered_df['layer'] = filtered_df['layer'].fillna("N-A")
 
-    # Choose the correct DataFrame based on filters
-    display_df = df if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else filtered_df
+    # Select the correct DataFrame based on filters
+    display_df = filtered_df.copy()
 
     # Calculate religion distribution by selected breakdown
     religion_counts = display_df.groupby([selected_breakdown, 'Religious Denomination Key']).size().unstack().fillna(0)
 
     # Define color map for religions
     color_map = {
-        'Islam': '#1f77b4', 'Kristen': '#ff7f0e', 'Katholik': '#2ca02c', 'Hindu': '#d62728', 
-        'Buddha': '#9467bd', 'Kepercayaan': '#8c564b', 'Kong Hu Cu': '#e377c2'
+        'Islam': '#1f77b4',       # Blue
+        'Kristen': '#ff7f0e',     # Orange
+        'Katholik': '#2ca02c',    # Green
+        'Hindu': '#d62728',       # Red
+        'Buddha': '#9467bd',      # Purple
+        'Kepercayaan': '#8c564b', # Brown
+        'Kong Hu Cu': '#e377c2'   # Pink
     }
 
     # Ensure all religions are present in the data
@@ -297,7 +357,7 @@ def display_religion_summary():
     religion_percentage = religion_counts.div(religion_counts.sum(axis=1), axis=0) * 100
     religion_percentage = religion_percentage.reset_index()
 
-    # Combine count and percentage data for tooltips
+    # Combine count and percentage data for tooltips and text labels
     religion_combined = religion_percentage.melt(id_vars=[selected_breakdown], value_vars=list(color_map.keys()),
                                                  var_name='Religion', value_name='Percentage')
     religion_combined = religion_combined.merge(
@@ -305,9 +365,12 @@ def display_religion_summary():
                                            var_name='Religion', value_name='Count'),
         on=[selected_breakdown, 'Religion']
     )
+    religion_combined['Label'] = religion_combined.apply(
+        lambda row: f"{int(row['Count'])} ({row['Percentage']:.1f}%)", axis=1
+    )
 
     # Display title with filter details
-    title_text = "Religion Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Religion Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    title_text = "Religion Metrics (All Units)" if not selected_units and not selected_subunits and not selected_layers else f"Religion Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Religion by {selected_breakdown}")
 
@@ -320,36 +383,46 @@ def display_religion_summary():
     # Display religion summary with percentages and counts
     cols = st.columns(len(color_map.keys()))
     for i, (rel, color) in enumerate(color_map.items()):
-        cols[i].markdown(f"<div style='text-align: center'><h5>{rel}</h5><h2><strong>{total_percentage[rel]}%</strong></h2><p>{int(religion_counts[rel].sum())}</p></div>", unsafe_allow_html=True)
+        cols[i].markdown(f"""
+            <div style='text-align: center'>
+                <h5 style="margin-bottom: 0;">{rel}</h5>
+                <h1><strong>{total_percentage[rel]}%</strong></h1>
+                <p>{int(religion_counts[rel].sum())}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
-    # Custom order for layer breakdown, including "N-A"
-    if selected_breakdown == 'layer':
-        custom_layer_order = [
-            "Group 5 STR Layer 1", "Group 4 STR Layer 2", "Group 3 STR Layer 3A",
-            "Group 3 STR Layer 3B", "Group 2 STR Layer 4", "Group 1 STR Layer 5",
-            "Group 5", "Group 4", "Group 3", "Group 2", "Group 1", "N-A"
-        ]
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown, sort=custom_layer_order)
-    else:
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown)
-
-    # Horizontal stacked percentage bar chart for Religion Distribution by Breakdown Variable
-    bar_chart = alt.Chart(religion_combined).mark_bar().encode(
-        x=alt.X('Percentage:Q', title='Percentage', scale=alt.Scale(domain=[0, 100])),
-        y=y_encoding,
-        color=alt.Color('Religion:N', scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values()))),
-        tooltip=[alt.Tooltip(f'{selected_breakdown}:N'), alt.Tooltip('Percentage:Q', format='.2f'),
-                 alt.Tooltip('Count:Q', title='Count'), 'Religion:N']
-    ).properties(
-        title=f'Religion Distribution by {selected_breakdown} (Stacked Bar Chart)',
-        width=700,
-        height=400
+    # Plotly stacked bar chart
+    fig = px.bar(
+        religion_combined,
+        x="Percentage",
+        y=selected_breakdown,
+        color="Religion",
+        orientation="h",
+        text="Label",
+        color_discrete_map=color_map,
+        labels={
+            "Percentage": "Percentage (%)",
+            selected_breakdown: selected_breakdown.capitalize(),
+            "Religion": "Religion"
+        },
     )
 
-    # Display the bar chart in Streamlit
-    st.altair_chart(bar_chart, use_container_width=True)
+    # Update layout to improve readability
+    fig.update_traces(textposition="inside", insidetextanchor="middle")
+    fig.update_layout(
+        title=f"Religion Distribution by {selected_breakdown}",
+        xaxis_title="Percentage (%)",
+        yaxis_title=selected_breakdown.capitalize(),
+        bargap=0.2,
+        height=600,
+        width=800,
+        legend_title="Religion"
+    )
+
+    # Display the Plotly chart in Streamlit
+    st.plotly_chart(fig, use_container_width=True)
 
 # Function to display tenure summary
 def display_tenure_summary():
@@ -358,7 +431,7 @@ def display_tenure_summary():
     filtered_df['layer'] = filtered_df['layer'].fillna("N-A")
 
     # Select the correct DataFrame based on filters
-    display_df = df if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else filtered_df
+    display_df = filtered_df.copy()
 
     # Define tenure groups and categorize them
     bins = [-1, 1, 3, 6, 10, 15, 20, 25, float('inf')]
@@ -383,7 +456,7 @@ def display_tenure_summary():
     tenure_percentage = tenure_counts.div(tenure_counts.sum(axis=1), axis=0) * 100
     tenure_percentage = tenure_percentage.reset_index()
 
-    # Combine count and percentage data for tooltips
+    # Combine count and percentage data for tooltips and text labels
     tenure_combined = tenure_percentage.melt(id_vars=[selected_breakdown], value_vars=list(color_map.keys()),
                                              var_name='Tenure Group', value_name='Percentage')
     tenure_combined = tenure_combined.merge(
@@ -391,9 +464,12 @@ def display_tenure_summary():
                                          var_name='Tenure Group', value_name='Count'),
         on=[selected_breakdown, 'Tenure Group']
     )
+    tenure_combined['Label'] = tenure_combined.apply(
+        lambda row: f"{int(row['Count'])} ({row['Percentage']:.1f}%)", axis=1
+    )
 
     # Display title with filter details
-    title_text = "Tenure Metrics (All Units)" if 'All' in selected_units and 'All' in selected_subunits and 'All' in selected_layers else f"Tenure Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
+    title_text = "Tenure Metrics (All Units)" if not selected_units and not selected_subunits and not selected_layers else f"Tenure Metrics (Filtered by {', '.join(selected_units)}, {', '.join(selected_subunits)}, {', '.join(selected_layers)})"
     st.title(title_text)
     st.subheader(f"Percentage of Tenure by {selected_breakdown}")
 
@@ -405,41 +481,51 @@ def display_tenure_summary():
 
     cols = st.columns(len(color_map.keys()))
     for i, (tenure, color) in enumerate(color_map.items()):
-        cols[i].markdown(f"<div style='text-align: center'><h5>{tenure}</h5><h2><strong>{total_percentage[tenure]}%</strong></h2><p>{int(tenure_counts[tenure].sum())}</p></div>", unsafe_allow_html=True)
+        cols[i].markdown(f"""
+            <div style='text-align: center'>
+                <h5 style="margin-bottom: 0;">{tenure}</h5>
+                <h1><strong>{total_percentage[tenure]}%</strong></h1>
+                <p>{int(tenure_counts[tenure].sum())}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<hr style='border:1px solid #000'>", unsafe_allow_html=True)
 
-    # Custom order for layer breakdown, including "N-A"
-    if selected_breakdown == 'layer':
-        custom_layer_order = [
-            "Group 5 STR Layer 1", "Group 4 STR Layer 2", "Group 3 STR Layer 3A",
-            "Group 3 STR Layer 3B", "Group 2 STR Layer 4", "Group 1 STR Layer 5",
-            "Group 5", "Group 4", "Group 3", "Group 2", "Group 1", "N-A"
-        ]
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown, sort=custom_layer_order)
-    else:
-        y_encoding = alt.Y(f'{selected_breakdown}:N', title=selected_breakdown)
-
-    # Horizontal stacked percentage bar chart for Tenure Distribution by Breakdown Variable
-    bar_chart = alt.Chart(tenure_combined).mark_bar().encode(
-        x=alt.X('Percentage:Q', title='Percentage', scale=alt.Scale(domain=[0, 100])),
-        y=y_encoding,
-        color=alt.Color('Tenure Group:N', scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values()))),
-        tooltip=[alt.Tooltip(f'{selected_breakdown}:N'), alt.Tooltip('Percentage:Q', format='.2f'),
-                 alt.Tooltip('Count:Q', title='Count'), 'Tenure Group:N']
-    ).properties(
-        title=f'Tenure Distribution by {selected_breakdown} (Stacked Bar Chart)',
-        width=700,
-        height=400
+    # Plotly stacked bar chart
+    fig = px.bar(
+        tenure_combined,
+        x="Percentage",
+        y=selected_breakdown,
+        color="Tenure Group",
+        orientation="h",
+        text="Label",
+        color_discrete_map=color_map,
+        labels={
+            "Percentage": "Percentage (%)",
+            selected_breakdown: selected_breakdown.capitalize(),
+            "Tenure Group": "Tenure Group"
+        },
     )
 
-    # Display the bar chart in Streamlit
-    st.altair_chart(bar_chart, use_container_width=True)
+    # Update layout to improve readability
+    fig.update_traces(textposition="inside", insidetextanchor="middle")
+    fig.update_layout(
+        title=f"Tenure Distribution by {selected_breakdown}",
+        xaxis_title="Percentage (%)",
+        yaxis_title=selected_breakdown.capitalize(),
+        bargap=0.2,
+        height=600,
+        width=800,
+        legend_title="Tenure Group"
+    )
 
+    # Display the Plotly chart in Streamlit
+    st.plotly_chart(fig, use_container_width=True)
 
-
-# Display the selected page's summary
-if selected_page == 'Gender':
+# Main logic to display the selected page's content
+if selected_page == '':
+    display_total_employees_with_breakdown()
+elif selected_page == 'Gender':
     display_gender_summary()
 elif selected_page == 'Generation':
     display_generation_summary()
