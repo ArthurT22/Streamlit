@@ -18,7 +18,7 @@ st.sidebar.header('KG DEI Dashboard')
 st.sidebar.header('Metrics')
 
 # Page selection with a blank option
-pages = ['', 'Gender', 'Generation', 'Religion', 'Tenure']
+pages = ['', 'Gender', 'Generation', 'Religion', 'Tenure', 'Region', 'Age']
 selected_page = st.sidebar.selectbox("Choose the Metrics you want to display:", pages)
 
 st.sidebar.header('Breakdown Variable')
@@ -103,11 +103,18 @@ def display_total_employees_with_breakdown():
     )
     breakdown_counts.rename(columns={selected_breakdown: selected_breakdown.capitalize()}, inplace=True)
     
-    # Reset the index to remove the default numbering
-    breakdown_counts = breakdown_counts.reset_index(drop=True)
+    # Convert the Count column to integer for clean display
+    breakdown_counts["Count"] = breakdown_counts["Count"].astype(int)
     
-    # Display the data in a table
-    st.table(breakdown_counts)
+    # Display the counts in two columns
+    st.markdown("### Employee Count by Breakdown")
+    col1, col2 = st.columns(2)
+    midpoint = len(breakdown_counts) // 2 + len(breakdown_counts) % 2  # Split data into two parts
+    for i, row in breakdown_counts.iterrows():
+        if i < midpoint:
+            col1.write(f"**{row[selected_breakdown.capitalize()]}**: {row['Count']:,}")
+        else:
+            col2.write(f"**{row[selected_breakdown.capitalize()]}**: {row['Count']:,}")
     
     # Create a horizontal bar chart
     fig = px.bar(
@@ -522,6 +529,126 @@ def display_tenure_summary():
     # Display the Plotly chart in Streamlit
     st.plotly_chart(fig, use_container_width=True)
 
+def display_region_summary():
+    # Ensure the region column exists and filter the data
+    if "region" not in df.columns:
+        st.error("The 'region' column is not available in the dataset.")
+        return
+
+    display_df = filtered_df.copy()
+
+    # Group by region and count the employees
+    region_counts = (
+        display_df.groupby("region")
+        .size()
+        .reset_index(name="Count")
+        .sort_values("Count", ascending=False)
+    )
+    region_counts.rename(columns={"region": "Region"}, inplace=True)
+
+    # Display the table in three columns
+    st.markdown("### Employee Count by Region")
+    num_rows = len(region_counts)
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        for i in range(0, num_rows, 3):  # First column: every 3rd item starting from 0
+            if i < num_rows:
+                st.write(f"**{region_counts.iloc[i]['Region']}**: {region_counts.iloc[i]['Count']}")
+
+    with col2:
+        for i in range(1, num_rows, 3):  # Second column: every 3rd item starting from 1
+            if i < num_rows:
+                st.write(f"**{region_counts.iloc[i]['Region']}**: {region_counts.iloc[i]['Count']}")
+
+    with col3:
+        for i in range(2, num_rows, 3):  # Third column: every 3rd item starting from 2
+            if i < num_rows:
+                st.write(f"**{region_counts.iloc[i]['Region']}**: {region_counts.iloc[i]['Count']}")
+
+    # Plotly bar chart for region distribution
+    fig = px.bar(
+        region_counts,
+        x="Count",
+        y="Region",
+        orientation="h",
+        text="Count",
+        color="Region",
+        color_discrete_sequence=px.colors.qualitative.Plotly,
+        labels={"Count": "Employee Count", "Region": "Region"},
+    )
+
+    # Update chart layout
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        title="Region-wise Employee Distribution",
+        xaxis_title="Employee Count",
+        yaxis_title="Region",
+        height=600,
+        width=800,
+        showlegend=False,
+    )
+
+    # Display the bar chart in Streamlit
+    st.plotly_chart(fig, use_container_width=True)
+
+def display_age_summary():
+    # Ensure the 'Age' column exists
+    if "Age" not in df.columns:
+        st.error("The 'Age' column is not available in the dataset.")
+        return
+
+    # Filter the dataset
+    display_df = filtered_df.copy()
+
+    # Count employees by individual age
+    age_counts = (
+        display_df.groupby("Age")
+        .size()
+        .reset_index(name="Count")
+        .sort_values("Age")
+    )
+
+    # Convert Count to integer for display
+    age_counts["Count"] = age_counts["Count"].astype(int)
+
+    # Split table into columns for better readability
+    st.markdown("### Employee Count by Age")
+    col1, col2, col3 = st.columns(3)
+
+    num_rows = len(age_counts)
+    for i, col in enumerate([col1, col2, col3]):
+        with col:
+            for j in range(i, num_rows, 3):  # Distribute rows across three columns
+                st.write(f"**{int(age_counts.iloc[j]['Age'])}**: {int(age_counts.iloc[j]['Count'])}")
+
+    # Plotly bar chart for individual age distribution
+    fig = px.bar(
+        age_counts,
+        x="Count",
+        y="Age",
+        orientation="h",
+        text="Count",
+        color="Age",
+        color_continuous_scale=px.colors.sequential.Viridis,
+        labels={"Count": "Employee Count", "Age": "Age"},
+    )
+
+    # Update chart layout
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        title="Age-wise Employee Distribution",
+        xaxis_title="Employee Count",
+        yaxis_title="Age",
+        height=600,
+        width=800,
+        showlegend=False,
+    )
+
+    # Display the bar chart
+    st.plotly_chart(fig, use_container_width=True)
+
+
 # Main logic to display the selected page's content
 if selected_page == '':
     display_total_employees_with_breakdown()
@@ -533,3 +660,7 @@ elif selected_page == 'Religion':
     display_religion_summary()
 elif selected_page == 'Tenure':
     display_tenure_summary()
+elif selected_page == 'Region':
+    display_region_summary()
+elif selected_page == 'Age':
+    display_age_summary()
